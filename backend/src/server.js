@@ -6,6 +6,7 @@ const authRoutes = require('./routes/auth');
 const bookingsRoutes = require('./routes/bookings');
 const favoritesRoutes = require('./routes/favorites');
 const adminRoutes = require('./routes/admin');
+const restaurantsRoutes = require('./routes/restaurants');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -29,6 +30,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/restaurants', restaurantsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -52,6 +54,7 @@ app.get('/', (req, res) => {
         bookings: '/api/bookings',
         favorites: '/api/favorites',
         admin: '/api/admin',
+        restaurants: '/api/restaurants',
         health: '/health',
       },
     },
@@ -98,6 +101,8 @@ app.listen(PORT, () => {
   console.log('  GET    /api/favorites/my');
   console.log('  GET    /api/favorites/check/:restaurantId');
   console.log('  DELETE /api/favorites/:restaurantId');
+  console.log('  GET    /api/restaurants');
+  console.log('  GET    /api/restaurants/:id');
   console.log('  GET    /api/admin/users');
   console.log('  GET    /api/admin/bookings');
   console.log('  GET    /api/admin/restaurants');

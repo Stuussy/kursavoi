@@ -161,33 +161,25 @@ class ProfileScreen extends StatelessWidget {
                     _MenuItem(
                       icon: Icons.favorite_outline,
                       title: 'Таңдаулы рестораны',
-                      onTap: () => context.go('/favorites'),
+                      onTap: () => context.push('/favorites'),
                     ),
                     _menuDivider(),
                     _MenuItem(
                       icon: Icons.calendar_today_outlined,
                       title: 'Брондарым',
-                      onTap: () => context.go('/bookings'),
+                      onTap: () => context.push('/bookings'),
                     ),
                     _menuDivider(),
                     _MenuItem(
                       icon: Icons.notifications_outlined,
                       title: 'Хабарламалар',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Жақында қосылады!')),
-                        );
-                      },
+                      onTap: () => context.push('/notifications'),
                     ),
                     _menuDivider(),
                     _MenuItem(
                       icon: Icons.help_outline,
                       title: 'Көмек және қолдау',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Жақында қосылады!')),
-                        );
-                      },
+                      onTap: () => context.push('/help'),
                     ),
                     _menuDivider(),
                     _MenuItem(
