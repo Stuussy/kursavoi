@@ -621,7 +621,9 @@ class _RestaurantsTab extends StatelessWidget {
                   controller: imageCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Сурет URL',
-                    hintText: 'https://...',
+                    hintText: 'https://images.unsplash.com/photo-...',
+                    helperText: 'Unsplash суреттерін қолданыңыз (CORS мәселесін болдырмау үшін)',
+                    helperMaxLines: 2,
                   ),
                 ),
                 const SizedBox(height: 12),

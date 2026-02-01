@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
@@ -18,24 +19,44 @@ class NetworkImageWidget extends StatelessWidget {
     this.borderRadius,
   });
 
+  /// Validates and processes the image URL
+  String? _processImageUrl(String url) {
+    if (url.isEmpty) return null;
+
+    // Trim whitespace
+    final trimmedUrl = url.trim();
+
+    // Check if it's a valid URL
+    if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+      return null;
+    }
+
+    return trimmedUrl;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // If URL is empty, show placeholder immediately
-    if (imageUrl.isEmpty) {
+    final processedUrl = _processImageUrl(imageUrl);
+
+    // If URL is empty or invalid, show placeholder immediately
+    if (processedUrl == null) {
       return _buildPlaceholder();
     }
 
     Widget imageWidget = Image.network(
-      imageUrl,
+      processedUrl,
       width: width,
       height: height,
       fit: fit,
+      // Add headers for better compatibility
+      headers: kIsWeb ? null : const {'Accept': 'image/*'},
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
         return _buildLoadingIndicator(loadingProgress);
       },
       errorBuilder: (context, error, stackTrace) {
         // CORS and other errors are handled here
+        debugPrint('Image load error for $processedUrl: $error');
         return _buildPlaceholder();
       },
     );
