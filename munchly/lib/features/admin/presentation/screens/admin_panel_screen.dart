@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/network_image_widget.dart';
 import '../providers/admin_provider.dart';
 import '../../data/datasources/admin_remote_datasource.dart';
+import '../../../home/presentation/providers/home_provider.dart';
 
 /// Admin panel screen with tabs
 class AdminPanelScreen extends StatefulWidget {
@@ -682,6 +684,8 @@ class _RestaurantsTab extends StatelessWidget {
                   );
                   if (success) {
                     provider.loadStats();
+                    // Refresh home screen restaurants list
+                    context.read<HomeProvider>().refresh();
                   }
                 }
               },
@@ -803,15 +807,12 @@ class _RestaurantCard extends StatelessWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: restaurant.imageUrl.isNotEmpty
-                  ? Image.network(
-                      restaurant.imageUrl,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholderImage(),
-                    )
-                  : _placeholderImage(),
+              child: NetworkImageWidget(
+                imageUrl: restaurant.imageUrl,
+                width: 80,
+                height: 80,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -892,7 +893,11 @@ class _RestaurantCard extends StatelessWidget {
                             backgroundColor: success ? AppTheme.successColor : AppTheme.errorColor,
                           ),
                         );
-                        if (success) provider.loadStats();
+                        if (success) {
+                          provider.loadStats();
+                          // Refresh home screen restaurants list
+                          context.read<HomeProvider>().refresh();
+                        }
                       }
                     }
                   },

@@ -32,6 +32,31 @@ class Restaurant extends Equatable {
     required this.isOpen,
   });
 
+  /// Create Restaurant from JSON
+  factory Restaurant.fromJson(Map<String, dynamic> json) {
+    return Restaurant(
+      id: json['id'] as String? ?? json['_id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      cuisine: json['cuisine'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: json['reviewCount'] as int? ?? 0,
+      priceRange: json['priceRange'] as String? ?? '\$\$',
+      imageUrl: json['imageUrl'] as String? ?? '',
+      openingHours: (json['openingHours'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          [],
+      tables: (json['tables'] as List<dynamic>?)
+              ?.map((e) => Table.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      isOpen: json['isOpen'] as bool? ?? true,
+    );
+  }
+
   @override
   List<Object?> get props => [
         id,
@@ -67,6 +92,18 @@ class Table extends Equatable {
     required this.isAvailable,
     this.location,
   });
+
+  /// Create Table from JSON
+  factory Table.fromJson(Map<String, dynamic> json) {
+    return Table(
+      id: json['id'] as String? ?? json['_id'] as String? ?? '',
+      restaurantId: json['restaurantId'] as String? ?? '',
+      number: json['number'] as int? ?? 0,
+      capacity: json['capacity'] as int? ?? 0,
+      isAvailable: json['isAvailable'] as bool? ?? true,
+      location: json['location'] as String?,
+    );
+  }
 
   @override
   List<Object?> get props => [

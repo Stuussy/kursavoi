@@ -21,6 +21,8 @@ import '../../features/favorites/presentation/providers/favorites_provider.dart'
 import '../../features/admin/data/datasources/admin_remote_datasource.dart';
 import '../../features/admin/data/datasources/admin_mock_datasource.dart';
 import '../../features/admin/presentation/providers/admin_provider.dart';
+import '../../features/home/presentation/providers/home_provider.dart';
+import '../../features/restaurants/data/datasources/restaurants_mock_datasource.dart';
 import '../network/dio_client.dart';
 import 'app_config.dart';
 
@@ -37,6 +39,8 @@ class DependencyInjection {
   static FavoritesMockDataSource? _favoritesMockDataSource;
   static AdminProvider? _adminProvider;
   static AdminMockDataSource? _adminMockDataSource;
+  static HomeProvider? _homeProvider;
+  static RestaurantsMockDataSource? _restaurantsMockDataSource;
 
   /// Initialize dependencies
   static Future<void> init() async {
@@ -132,6 +136,13 @@ class DependencyInjection {
       datasource: adminRemoteDataSource,
       mockDataSource: _adminMockDataSource,
     );
+
+    // Home
+    _restaurantsMockDataSource = RestaurantsMockDataSource();
+    _homeProvider = HomeProvider(
+      dioClient: _dioClient!,
+      mockDataSource: _restaurantsMockDataSource,
+    );
   }
 
   /// Get DioClient instance
@@ -154,4 +165,7 @@ class DependencyInjection {
 
   /// Get AdminProvider instance
   static AdminProvider get adminProvider => _adminProvider!;
+
+  /// Get HomeProvider instance
+  static HomeProvider get homeProvider => _homeProvider!;
 }
