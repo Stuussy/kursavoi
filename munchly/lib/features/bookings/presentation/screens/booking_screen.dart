@@ -3,8 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../auth/presentation/widgets/custom_text_field.dart';
-import '../../../restaurants/data/datasources/restaurants_mock_datasource.dart';
+import '../../../home/presentation/providers/home_provider.dart';
+import '../../../restaurants/domain/entities/restaurant.dart';
 import '../providers/bookings_provider.dart';
 
 /// Booking screen for making reservations
@@ -21,9 +21,9 @@ class _BookingScreenState extends State<BookingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-  TimeOfDay _selectedTime = TimeOfDay.now();
+  TimeOfDay _selectedTime = const TimeOfDay(hour: 19, minute: 0);
   int _guests = 2;
-  String? _selectedTableId;
+  int? _selectedTableIndex;
   bool _isLoading = false;
 
   @override
@@ -38,6 +38,19 @@ class _BookingScreenState extends State<BookingScreen> {
       initialDate: _selectedDate,
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 90)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppTheme.primaryColor,
+              onPrimary: Colors.white,
+              surface: AppTheme.surfaceColor,
+              onSurface: AppTheme.textPrimaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -50,6 +63,19 @@ class _BookingScreenState extends State<BookingScreen> {
     final picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppTheme.primaryColor,
+              onPrimary: Colors.white,
+              surface: AppTheme.surfaceColor,
+              onSurface: AppTheme.textPrimaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) {
       setState(() {
@@ -58,17 +84,32 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  Future<void> _submitBooking() async {
+  Future<void> _submitBooking(Restaurant restaurant) async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedTableId == null) {
+    if (_selectedTableIndex == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Үстелді таңдаңыз'),
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Үстелді таңдаңыз'),
+            ],
+          ),
           backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       return;
     }
+
+    final availableTables = restaurant.tables.where((t) => t.isAvailable && t.capacity >= _guests).toList();
+    if (_selectedTableIndex! >= availableTables.length) {
+      return;
+    }
+
+    final selectedTable = availableTables[_selectedTableIndex!];
 
     setState(() {
       _isLoading = true;
@@ -78,37 +119,88 @@ class _BookingScreenState extends State<BookingScreen> {
       final bookingsProvider = context.read<BookingsProvider>();
       final authProvider = context.read<AuthProvider>();
       final userId = authProvider.currentUser?.id ?? 'unknown';
-      final dataSource = RestaurantsMockDataSource();
-      final restaurant = dataSource.getRestaurantById(widget.restaurantId);
-
-      if (restaurant == null) return;
-
-      // Get table details
-      final table = restaurant.tables.firstWhere(
-        (t) => t.id == _selectedTableId,
-      );
 
       await bookingsProvider.createBooking(
         restaurantId: widget.restaurantId,
         restaurantName: restaurant.name,
-        tableId: _selectedTableId!,
-        tableNumber: table.number,
+        tableId: selectedTable.id,
+        tableNumber: selectedTable.number,
         userId: userId,
         date: _selectedDate,
-        time:
-            '${_selectedTime.hour}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+        time: '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
         guests: _guests,
       );
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Брондау сәтті жасалды!'),
-          backgroundColor: AppTheme.successColor,
+      // Show success dialog
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.check_circle,
+                  color: AppTheme.successColor,
+                  size: 64,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Брондау сәтті!',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${restaurant.name}\n'
+                'Үстел №${selectedTable.number}\n'
+                '${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year} - ${_selectedTime.format(context)}\n'
+                '$_guests қонақ',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondaryColor,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    context.go('/');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Жарайды',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
-      context.go('/');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,18 +220,40 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dataSource = RestaurantsMockDataSource();
-    final restaurant = dataSource.getRestaurantById(widget.restaurantId);
+    final homeProvider = context.watch<HomeProvider>();
+    final restaurant = homeProvider.getRestaurantById(widget.restaurantId);
 
     if (restaurant == null) {
       return Scaffold(
-        appBar: AppBar(),
-        body: const Center(child: Text('Рестораны табылмады')),
+        appBar: AppBar(title: const Text('Үстел брондау')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.restaurant_outlined,
+                size: 64,
+                color: AppTheme.textSecondaryColor,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Рестораны табылмады',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.pop(),
+                child: const Text('Артқа'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
-    final availableTables =
-        restaurant.tables.where((t) => t.isAvailable).toList();
+    final availableTables = restaurant.tables
+        .where((t) => t.isAvailable && t.capacity >= _guests)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -149,431 +263,524 @@ class _BookingScreenState extends State<BookingScreen> {
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Premium restaurant info card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppTheme.primaryColor.withValues(alpha: 0.1),
-                      AppTheme.secondaryColor.withValues(alpha: 0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.2),
-                    width: 1.5,
+              // Restaurant info card
+              _buildRestaurantCard(restaurant),
+              const SizedBox(height: 24),
+
+              // Date and Time selection
+              _buildDateTimeSection(),
+              const SizedBox(height: 24),
+
+              // Guests counter
+              _buildGuestsSection(),
+              const SizedBox(height: 24),
+
+              // Table selection
+              _buildTableSelection(availableTables),
+              const SizedBox(height: 24),
+
+              // Notes
+              _buildNotesSection(),
+              const SizedBox(height: 32),
+
+              // Submit button
+              _buildSubmitButton(restaurant),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRestaurantCard(Restaurant restaurant) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppTheme.primaryColor.withOpacity(0.1),
+            AppTheme.secondaryColor.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.primaryColor.withOpacity(0.2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: AppTheme.primaryGradient),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.restaurant, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  restaurant.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 4),
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: AppTheme.primaryGradient,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.restaurant,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                    Icon(Icons.location_on, size: 14, color: AppTheme.secondaryColor),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        restaurant.address,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondaryColor,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                restaurant.name,
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    size: 16,
-                                    color: AppTheme.secondaryColor,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      restaurant.address,
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: AppTheme.textSecondaryColor,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Date and Time selection in row
-              Row(
-                children: [
-                  // Date selection
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Күні',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.3,
-                              ),
-                        ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          onTap: _selectDate,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                                width: 1.5,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.08),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.calendar_today,
-                                  color: AppTheme.primaryColor,
-                                  size: 28,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${_selectedDate.day}/${_selectedDate.month}',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                Text(
-                                  '${_selectedDate.year}',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.textSecondaryColor,
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
+  Widget _buildDateTimeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Күн мен уақыт',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            // Date
+            Expanded(
+              child: InkWell(
+                onTap: _selectDate,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.primaryColor.withOpacity(0.3),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  // Time selection
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Уақыт',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_today, color: AppTheme.primaryColor, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Күні',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondaryColor,
+                              ),
+                            ),
+                            Text(
+                              '${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year}',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 0.3,
                               ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        InkWell(
-                          onTap: _selectTime,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: AppTheme.surfaceColor,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: AppTheme.secondaryColor.withValues(alpha: 0.3),
-                                width: 1.5,
+                      ),
+                      Icon(Icons.arrow_drop_down, color: AppTheme.textSecondaryColor),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Time
+            Expanded(
+              child: InkWell(
+                onTap: _selectTime,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppTheme.secondaryColor.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.access_time, color: AppTheme.secondaryColor, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Уақыт',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondaryColor,
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.secondaryColor.withValues(alpha: 0.08),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
                             ),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.access_time,
-                                  color: AppTheme.secondaryColor,
-                                  size: 28,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _selectedTime.format(context),
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                Text(
-                                  'Уақыт',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.textSecondaryColor,
-                                      ),
-                                ),
-                              ],
+                            Text(
+                              _selectedTime.format(context),
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
+                      Icon(Icons.arrow_drop_down, color: AppTheme.textSecondaryColor),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGuestsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Қонақтар саны',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.accentColor.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                onPressed: _guests > 1 ? () => setState(() {
+                  _guests--;
+                  _selectedTableIndex = null;
+                }) : null,
+                icon: Icon(
+                  Icons.remove_circle,
+                  color: _guests > 1 ? AppTheme.primaryColor : AppTheme.textSecondaryColor,
+                  size: 32,
+                ),
+              ),
+              Column(
+                children: [
+                  Icon(Icons.people, color: AppTheme.accentColor, size: 28),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$_guests',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryColor,
+                    ),
+                  ),
+                  Text(
+                    _guests == 1 ? 'адам' : 'адам',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-
-              // Premium guests counter
-              Text(
-                'Қонақтар саны',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      AppTheme.accentColor.withValues(alpha: 0.1),
-                      AppTheme.primaryColor.withValues(alpha: 0.1),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.accentColor.withValues(alpha: 0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: _guests > 1
-                            ? LinearGradient(colors: AppTheme.primaryGradient)
-                            : null,
-                        color: _guests > 1 ? null : AppTheme.textSecondaryColor,
-                        shape: BoxShape.circle,
-                        boxShadow: _guests > 1
-                            ? [
-                                BoxShadow(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: IconButton(
-                        onPressed: _guests > 1 ? () => setState(() => _guests--) : null,
-                        icon: const Icon(Icons.remove, color: Colors.white),
-                      ),
-                    ),
-                    Column(
-                      children: [
-                        Icon(
-                          Icons.people,
-                          color: AppTheme.accentColor,
-                          size: 32,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '$_guests',
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.primaryColor,
-                              ),
-                        ),
-                        Text(
-                          _guests == 1 ? 'Қонақ' : 'Қонақтар',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppTheme.textSecondaryColor,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: _guests < 10
-                            ? LinearGradient(colors: AppTheme.primaryGradient)
-                            : null,
-                        color: _guests < 10 ? null : AppTheme.textSecondaryColor,
-                        shape: BoxShape.circle,
-                        boxShadow: _guests < 10
-                            ? [
-                                BoxShadow(
-                                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: IconButton(
-                        onPressed: _guests < 10 ? () => setState(() => _guests++) : null,
-                        icon: const Icon(Icons.add, color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Table selection
-              Text(
-                'Үстелді таңдаңыз',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              if (availableTables.isEmpty)
-                Text(
-                  'Үстел жоқ',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: AppTheme.errorColor),
-                )
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      availableTables.map((table) {
-                        final isSelected = _selectedTableId == table.id;
-                        return FilterChip(
-                          label: Text(
-                            'Үстел ${table.number} (${table.capacity} орын)',
-                          ),
-                          selected: isSelected,
-                          onSelected: (_) {
-                            setState(() {
-                              _selectedTableId = table.id;
-                            });
-                          },
-                        );
-                      }).toList(),
-                ),
-              const SizedBox(height: 20),
-
-              // Notes
-              CustomTextField(
-                label: 'Арнайы өтініштер (міндетті емес)',
-                hint: 'Арнайы өтініштер немесе диетаға қатысты ескертпелер...',
-                controller: _notesController,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 32),
-
-              // Premium gradient submit button
-              Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  gradient: !_isLoading
-                      ? LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: AppTheme.primaryGradient,
-                        )
-                      : null,
-                  color: _isLoading ? AppTheme.textSecondaryColor : null,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: !_isLoading
-                      ? [
-                          BoxShadow(
-                            color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _isLoading ? null : _submitBooking,
-                    borderRadius: BorderRadius.circular(16),
-                    child: Center(
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'Брондауды растау',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
+              IconButton(
+                onPressed: _guests < 12 ? () => setState(() {
+                  _guests++;
+                  _selectedTableIndex = null;
+                }) : null,
+                icon: Icon(
+                  Icons.add_circle,
+                  color: _guests < 12 ? AppTheme.primaryColor : AppTheme.textSecondaryColor,
+                  size: 32,
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTableSelection(List<Table> availableTables) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Үстелді таңдаңыз',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              '${availableTables.length} қолжетімді',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.successColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (availableTables.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppTheme.errorColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: AppTheme.errorColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '$_guests адамға арналған үстел жоқ.\nҚонақтар санын азайтыңыз.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.errorColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.3,
+            ),
+            itemCount: availableTables.length,
+            itemBuilder: (context, index) {
+              final table = availableTables[index];
+              final isSelected = _selectedTableIndex == index;
+
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _selectedTableIndex = index;
+                  });
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: isSelected
+                        ? LinearGradient(colors: AppTheme.primaryGradient)
+                        : null,
+                    color: isSelected ? null : AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.transparent
+                          : AppTheme.textSecondaryColor.withOpacity(0.2),
+                      width: 2,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: AppTheme.primaryColor.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.table_restaurant,
+                        size: 32,
+                        color: isSelected ? Colors.white : AppTheme.primaryColor,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Үстел №${table.number}',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: isSelected ? Colors.white : AppTheme.textPrimaryColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.person,
+                            size: 14,
+                            color: isSelected ? Colors.white70 : AppTheme.textSecondaryColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${table.capacity} орын',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isSelected ? Colors.white70 : AppTheme.textSecondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (table.location != null && table.location!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            table.location!,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isSelected ? Colors.white60 : AppTheme.textSecondaryColor,
+                              fontSize: 10,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildNotesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Қосымша ескертпелер',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _notesController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Арнайы өтініштер немесе диетаға қатысты ескертпелер...',
+            hintStyle: TextStyle(color: AppTheme.textSecondaryColor),
+            filled: true,
+            fillColor: AppTheme.surfaceColor,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.textSecondaryColor.withOpacity(0.2)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.textSecondaryColor.withOpacity(0.2)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppTheme.primaryColor, width: 2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubmitButton(Restaurant restaurant) {
+    final availableTables = restaurant.tables
+        .where((t) => t.isAvailable && t.capacity >= _guests)
+        .toList();
+    final canSubmit = _selectedTableIndex != null && availableTables.isNotEmpty;
+
+    return Container(
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: canSubmit && !_isLoading
+            ? LinearGradient(colors: AppTheme.primaryGradient)
+            : null,
+        color: canSubmit && !_isLoading ? null : AppTheme.textSecondaryColor.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: canSubmit && !_isLoading
+            ? [
+                BoxShadow(
+                  color: AppTheme.primaryColor.withOpacity(0.4),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: canSubmit && !_isLoading ? () => _submitBooking(restaurant) : null,
+          borderRadius: BorderRadius.circular(16),
+          child: Center(
+            child: _isLoading
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: canSubmit ? Colors.white : AppTheme.textSecondaryColor,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Брондауды растау',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: canSubmit ? Colors.white : AppTheme.textSecondaryColor,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),
