@@ -6,6 +6,10 @@ import '../../features/main/presentation/screens/main_screen.dart';
 import '../../features/restaurants/presentation/screens/restaurant_details_screen.dart';
 import '../../features/bookings/presentation/screens/booking_screen.dart';
 import '../../features/profile/presentation/screens/edit_profile_screen.dart';
+import '../../features/profile/presentation/screens/notifications_screen.dart';
+import '../../features/profile/presentation/screens/help_screen.dart';
+import '../../features/profile/presentation/screens/favorites_screen.dart';
+import '../../features/bookings/presentation/screens/my_bookings_screen.dart';
 import 'dependency_injection.dart';
 
 /// App router configuration
@@ -75,6 +79,34 @@ class AppRouter {
         path: '/edit-profile',
         name: 'edit-profile',
         builder: (context, state) => const EditProfileScreen(),
+      ),
+
+      // Notifications route
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+
+      // Help route
+      GoRoute(
+        path: '/help',
+        name: 'help',
+        builder: (context, state) => const HelpScreen(),
+      ),
+
+      // Favorites route (standalone page)
+      GoRoute(
+        path: '/favorites',
+        name: 'favorites',
+        builder: (context, state) => const FavoritesScreen(),
+      ),
+
+      // My Bookings route (standalone page)
+      GoRoute(
+        path: '/bookings',
+        name: 'bookings',
+        builder: (context, state) => const MyBookingsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
