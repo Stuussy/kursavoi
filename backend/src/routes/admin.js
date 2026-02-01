@@ -115,18 +115,34 @@ router.post('/restaurants', async (req, res) => {
       });
     }
 
+    // Default tables if not provided
+    const defaultTables = [
+      { number: 1, capacity: 2, location: 'Терезе жанында', isAvailable: true },
+      { number: 2, capacity: 2, location: 'Терезе жанында', isAvailable: true },
+      { number: 3, capacity: 4, location: 'Орталық', isAvailable: true },
+      { number: 4, capacity: 4, location: 'Орталық', isAvailable: true },
+      { number: 5, capacity: 6, location: 'VIP бөлме', isAvailable: true },
+      { number: 6, capacity: 8, location: 'VIP бөлме', isAvailable: true },
+    ];
+
+    // Default opening hours
+    const defaultOpeningHours = [
+      'Дүйсенбі - Жұма: 10:00 - 22:00',
+      'Сенбі - Жексенбі: 11:00 - 23:00',
+    ];
+
     const restaurant = new Restaurant({
       name,
       description,
       cuisine,
       address,
       phone,
-      rating: rating || 0,
+      rating: rating || 4.0,
       reviewCount: reviewCount || 0,
       priceRange,
       imageUrl: imageUrl || '',
-      openingHours: openingHours || [],
-      tables: tables || [],
+      openingHours: openingHours && openingHours.length > 0 ? openingHours : defaultOpeningHours,
+      tables: tables && tables.length > 0 ? tables : defaultTables,
       isOpen: isOpen !== undefined ? isOpen : true,
     });
 
