@@ -37,6 +37,9 @@ class MunchlyApp extends StatelessWidget {
         ChangeNotifierProvider.value(
           value: DependencyInjection.bookingsProvider,
         ),
+        ChangeNotifierProvider.value(
+          value: DependencyInjection.homeProvider,
+        ),
       ],
       child: MaterialApp.router(
         title: AppConstants.appName,

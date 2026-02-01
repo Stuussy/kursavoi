@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../data/datasources/restaurants_mock_datasource.dart';
+import '../../../../core/widgets/network_image_widget.dart';
+import '../../../home/presentation/providers/home_provider.dart';
 
 /// Restaurant details screen
 class RestaurantDetailsScreen extends StatelessWidget {
@@ -11,8 +13,8 @@ class RestaurantDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dataSource = RestaurantsMockDataSource();
-    final restaurant = dataSource.getRestaurantById(restaurantId);
+    final homeProvider = context.watch<HomeProvider>();
+    final restaurant = homeProvider.getRestaurantById(restaurantId);
 
     if (restaurant == null) {
       return Scaffold(
@@ -32,29 +34,9 @@ class RestaurantDetailsScreen extends StatelessWidget {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Restaurant image
-                  Image.network(
-                    restaurant.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppTheme.primaryColor.withValues(alpha: 0.3),
-                              AppTheme.secondaryColor.withValues(alpha: 0.3),
-                            ],
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.restaurant,
-                          size: 140,
-                          color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                        ),
-                      );
-                    },
+                  // Restaurant image with CORS handling
+                  RestaurantDetailImage(
+                    imageUrl: restaurant.imageUrl,
                   ),
                   // Bottom gradient overlay
                   Positioned(

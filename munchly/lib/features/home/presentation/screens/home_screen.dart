@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/network_image_widget.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../favorites/presentation/providers/favorites_provider.dart';
 import '../../../restaurants/domain/entities/restaurant.dart';
-import '../../../restaurants/data/datasources/restaurants_mock_datasource.dart';
+import '../providers/home_provider.dart';
 
 /// Modern Home screen with restaurant listings
 class HomeScreen extends StatefulWidget {
@@ -16,17 +17,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _mockDataSource = RestaurantsMockDataSource();
-  late List<Restaurant> _restaurants;
-  late List<Restaurant> _filteredRestaurants;
   final _searchController = TextEditingController();
-  String _selectedCuisine = 'Барлығы';
 
   @override
   void initState() {
     super.initState();
-    _restaurants = _mockDataSource.getAllRestaurants();
-    _filteredRestaurants = _restaurants;
+    // Load restaurants when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HomeProvider>().loadRestaurants();
+    });
   }
 
   @override
@@ -35,43 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _filterRestaurants(String query) {
-    setState(() {
-      final englishCuisine = _mapCuisineToEnglish(_selectedCuisine);
-      if (query.isEmpty) {
-        _filteredRestaurants = englishCuisine == 'All'
-            ? _restaurants
-            : _restaurants
-                .where((r) => r.cuisine == englishCuisine)
-                .toList();
-      } else {
-        _filteredRestaurants = _mockDataSource
-            .searchRestaurants(query)
-            .where((r) =>
-                englishCuisine == 'All' || r.cuisine == englishCuisine)
-            .toList();
-      }
-    });
-  }
-
-  void _filterByCuisine(String cuisine) {
-    setState(() {
-      _selectedCuisine = cuisine;
-      _filterRestaurants(_searchController.text);
-    });
-  }
-
-  String _mapCuisineToEnglish(String cuisine) {
-    return cuisine == 'Барлығы' ? 'All' : cuisine;
-  }
-
-  String _mapCuisineToKazakh(String cuisine) {
-    return cuisine == 'All' ? 'Барлығы' : cuisine;
-  }
-
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final homeProvider = context.watch<HomeProvider>();
     final user = authProvider.currentUser;
 
     final cuisines = ['Барлығы', 'Italian', 'Japanese', 'American', 'Indian', 'French', 'Mexican'];
@@ -125,15 +91,42 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                           ],
                         ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                            onPressed: () {},
-                          ),
+                        Row(
+                          children: [
+                            // Refresh button
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: homeProvider.isLoading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Icon(Icons.refresh, color: Colors.white),
+                                onPressed: homeProvider.isLoading
+                                    ? null
+                                    : () => homeProvider.refresh(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                                onPressed: () {},
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -153,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
-                        onChanged: _filterRestaurants,
+                        onChanged: (query) => homeProvider.searchRestaurants(query),
                         decoration: InputDecoration(
                           hintText: 'Рестораны іздеу...',
                           hintStyle: TextStyle(color: AppTheme.textSecondaryColor),
@@ -163,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   icon: const Icon(Icons.clear),
                                   onPressed: () {
                                     _searchController.clear();
-                                    _filterRestaurants('');
+                                    homeProvider.searchRestaurants('');
                                   },
                                 )
                               : null,
@@ -187,13 +180,13 @@ class _HomeScreenState extends State<HomeScreen> {
               itemCount: cuisines.length,
               itemBuilder: (context, index) {
                 final cuisine = cuisines[index];
-                final isSelected = _selectedCuisine == cuisine;
+                final isSelected = homeProvider.selectedCuisine == cuisine;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
                     label: Text(cuisine),
                     selected: isSelected,
-                    onSelected: (_) => _filterByCuisine(cuisine),
+                    onSelected: (_) => homeProvider.filterByCuisine(cuisine),
                     backgroundColor: AppTheme.surfaceColor,
                     selectedColor: AppTheme.primaryColor,
                     labelStyle: TextStyle(
@@ -211,37 +204,78 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // Restaurant list
           Expanded(
-            child: _filteredRestaurants.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.restaurant_outlined,
-                          size: 64,
-                          color: AppTheme.textSecondaryColor,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Рестораны табылмады',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredRestaurants.length,
-                    itemBuilder: (context, index) {
-                      final restaurant = _filteredRestaurants[index];
-                      return _RestaurantCard(
-                        restaurant: restaurant,
-                        onTap: () => context.push('/restaurant/${restaurant.id}'),
-                      );
-                    },
-                  ),
+            child: _buildRestaurantList(homeProvider),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildRestaurantList(HomeProvider homeProvider) {
+    if (homeProvider.isLoading && homeProvider.restaurants.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (homeProvider.errorMessage != null && homeProvider.restaurants.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: AppTheme.errorColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              homeProvider.errorMessage!,
+              style: Theme.of(context).textTheme.titleMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => homeProvider.refresh(),
+              child: const Text('Қайталап көру'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (homeProvider.filteredRestaurants.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.restaurant_outlined,
+              size: 64,
+              color: AppTheme.textSecondaryColor,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Рестораны табылмады',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => homeProvider.refresh(),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: homeProvider.filteredRestaurants.length,
+        itemBuilder: (context, index) {
+          final restaurant = homeProvider.filteredRestaurants[index];
+          return _RestaurantCard(
+            restaurant: restaurant,
+            onTap: () => context.push('/restaurant/${restaurant.id}'),
+          );
+        },
       ),
     );
   }
@@ -274,33 +308,10 @@ class _RestaurantCard extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               child: Stack(
                 children: [
-                  // Restaurant image
-                  Image.network(
-                    restaurant.imageUrl,
+                  // Restaurant image with CORS handling
+                  RestaurantCardImage(
+                    imageUrl: restaurant.imageUrl,
                     height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 200,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppTheme.primaryColor.withOpacity(0.2),
-                              AppTheme.secondaryColor.withOpacity(0.2),
-                            ],
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.restaurant,
-                          size: 90,
-                          color: AppTheme.primaryColor.withOpacity(0.4),
-                        ),
-                      );
-                    },
                   ),
                   // Bottom gradient overlay for better text visibility
                   Positioned(
