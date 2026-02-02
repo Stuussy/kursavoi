@@ -220,6 +220,21 @@ class ProfileScreen extends StatelessWidget {
                   onPressed: () async {
                     await authProvider.logout();
                     if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.logout, color: Colors.white),
+                              SizedBox(width: 12),
+                              Text('Сәтті шықтыңыз. Сау болыңыз!'),
+                            ],
+                          ),
+                          backgroundColor: AppTheme.primaryColor,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
                       context.go('/login');
                     }
                   },
