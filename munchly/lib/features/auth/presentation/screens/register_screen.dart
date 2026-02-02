@@ -48,6 +48,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
 
     if (success) {
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 12),
+              Text('Сәтті тіркелдіңіз! Қош келдіңіз, ${_nameController.text.trim()}'),
+            ],
+          ),
+          backgroundColor: AppTheme.successColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
       // Navigate to home
       context.go('/');
     } else {
@@ -133,13 +149,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Phone field
                   CustomTextField(
                     label: 'Телефон нөмірі',
-                    hint: 'Телефон нөміріңізді енгізіңіз',
+                    hint: '+7 XXX XXX XX XX',
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     prefixIcon: const Icon(Icons.phone_outlined),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Телефон нөміріңізді енгізіңіз';
+                      }
+                      if (!value.startsWith('+7')) {
+                        return 'Нөмір +7 басталуы керек';
+                      }
+                      // Remove spaces and check length
+                      final cleanNumber = value.replaceAll(' ', '').replaceAll('-', '');
+                      if (cleanNumber.length < 12) {
+                        return 'Толық нөмірді енгізіңіз (+7 XXX XXX XX XX)';
                       }
                       return null;
                     },
@@ -172,10 +196,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value.length < 6) {
                         return 'Құпия сөз кемінде 6 таңбадан тұруы керек';
                       }
+                      if (!value.contains(RegExp(r'[A-Z]'))) {
+                        return 'Кемінде 1 бас әріп болуы керек (A-Z)';
+                      }
+                      if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
+                        return 'Кемінде 1 арнайы таңба болуы керек (!@#\$%^&*)';
+                      }
                       return null;
                     },
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 8),
+                  // Password hint
+                  Text(
+                    'Құпия сөз: кемінде 6 таңба, 1 бас әріп, 1 арнайы таңба',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondaryColor,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
                   // Confirm password field
                   CustomTextField(
