@@ -2,7 +2,7 @@ require('dotenv').config();
 const mongoose = require('mongoose');
 const Restaurant = require('./src/models/Restaurant');
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/munchly';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Rasul:Rasul2008@munchly.b8vuuza.mongodb.net/munchly?retryWrites=true&w=majority';
 
 // Sample restaurants with Unsplash images (CORS-friendly)
 const sampleRestaurants = [
