@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 // MongoDB connection string
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/munchly';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://Rasul:Rasul2008@munchly.b8vuuza.mongodb.net/munchly?retryWrites=true&w=majority';
 
 // User schema (same as in models/User.js)
 const userSchema = new mongoose.Schema({
