@@ -70,8 +70,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Show error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Тіркелу сәтсіз аяқталды'),
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(authProvider.errorMessage ?? 'Тіркелу сәтсіз аяқталды'),
+              ),
+            ],
+          ),
           backgroundColor: AppTheme.errorColor,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 3),
         ),
       );
     }

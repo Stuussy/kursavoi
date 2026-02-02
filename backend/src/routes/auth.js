@@ -40,7 +40,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Email, password, and name are required',
+          message: 'Email, құпия сөз және аты міндетті',
         },
       });
     }
@@ -51,7 +51,7 @@ router.post('/register', async (req, res) => {
       return res.status(409).json({
         error: {
           code: 'USER_EXISTS',
-          message: 'User with this email already exists',
+          message: 'Бұл email-мен пайдаланушы бар',
         },
       });
     }
@@ -83,7 +83,7 @@ router.post('/register', async (req, res) => {
     res.status(500).json({
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to register user',
+        message: 'Тіркелу кезінде қате орын алды',
       },
     });
   }
@@ -99,7 +99,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Email and password are required',
+          message: 'Email және құпия сөз міндетті',
         },
       });
     }
@@ -111,7 +111,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         error: {
           code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
+          message: 'Email немесе құпия сөз қате',
         },
       });
     }
@@ -123,7 +123,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({
         error: {
           code: 'INVALID_CREDENTIALS',
-          message: 'Invalid email or password',
+          message: 'Құпия сөз қате. Қайта енгізіңіз',
         },
       });
     }
@@ -145,7 +145,7 @@ router.post('/login', async (req, res) => {
     res.status(500).json({
       error: {
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to login',
+        message: 'Кіру кезінде қате орын алды',
       },
     });
   }
