@@ -6,6 +6,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../home/presentation/providers/home_provider.dart';
 import '../../../restaurants/domain/entities/restaurant.dart';
 import '../providers/bookings_provider.dart';
+import '../widgets/kaspi_payment_sheet.dart';
 
 /// Booking screen for making reservations
 class BookingScreen extends StatefulWidget {
@@ -25,6 +26,9 @@ class _BookingScreenState extends State<BookingScreen> {
   int _guests = 2;
   int? _selectedTableIndex;
   bool _isLoading = false;
+
+  // Booking deposit amount in tenge
+  static const int _depositAmount = 2000;
 
   @override
   void dispose() {
@@ -110,7 +114,35 @@ class _BookingScreenState extends State<BookingScreen> {
     }
 
     final selectedTable = availableTables[_selectedTableIndex!];
+    final timeStr = '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}';
+    final dateStr = '${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year}';
 
+    // Show Kaspi payment sheet
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) => KaspiPaymentSheet(
+        restaurantName: restaurant.name,
+        tableNumber: selectedTable.number,
+        date: dateStr,
+        time: timeStr,
+        guests: _guests,
+        amount: _depositAmount,
+        onPaymentConfirmed: () async {
+          Navigator.pop(ctx);
+          await _completeBooking(restaurant, selectedTable, timeStr);
+        },
+        onCancel: () {
+          Navigator.pop(ctx);
+        },
+      ),
+    );
+  }
+
+  Future<void> _completeBooking(Restaurant restaurant, Table selectedTable, String timeStr) async {
     setState(() {
       _isLoading = true;
     });
@@ -127,7 +159,7 @@ class _BookingScreenState extends State<BookingScreen> {
         tableNumber: selectedTable.number,
         userId: userId,
         date: _selectedDate,
-        time: '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+        time: timeStr,
         guests: _guests,
       );
 
@@ -166,7 +198,8 @@ class _BookingScreenState extends State<BookingScreen> {
                 '${restaurant.name}\n'
                 'Үстел №${selectedTable.number}\n'
                 '${_selectedDate.day}.${_selectedDate.month}.${_selectedDate.year} - ${_selectedTime.format(context)}\n'
-                '$_guests қонақ',
+                '$_guests қонақ\n\n'
+                'Төленді: $_depositAmount ₸',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textSecondaryColor,
@@ -285,7 +318,11 @@ class _BookingScreenState extends State<BookingScreen> {
 
               // Notes
               _buildNotesSection(),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+
+              // Payment info
+              _buildPaymentInfo(),
+              const SizedBox(height: 24),
 
               // Submit button
               _buildSubmitButton(restaurant),
@@ -722,6 +759,85 @@ class _BookingScreenState extends State<BookingScreen> {
     );
   }
 
+  Widget _buildPaymentInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFF14635).withOpacity(0.1),
+            const Color(0xFFFF6B35).withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFF14635).withOpacity(0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF14635),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Kaspi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Брондау депозиті',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Text(
+                '$_depositAmount ₸',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFF14635),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: AppTheme.textSecondaryColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Депозит брондауды растау үшін қажет. Ресторанға келгенде негізгі шоттан шегеріледі.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSubmitButton(Restaurant restaurant) {
     final availableTables = restaurant.tables
         .where((t) => t.isAvailable && t.capacity >= _guests)
@@ -765,13 +881,13 @@ class _BookingScreenState extends State<BookingScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.check_circle,
+                        Icons.payment,
                         color: canSubmit ? Colors.white : AppTheme.textSecondaryColor,
                         size: 22,
                       ),
                       const SizedBox(width: 10),
                       Text(
-                        'Брондауды растау',
+                        'Төлем жасау • $_depositAmount ₸',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
